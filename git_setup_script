@@ -1,0 +1,23 @@
+create database git;
+create schema git_schema;
+
+create or replace secret git_secret
+type=PASSWORD
+username='hkandpal'
+password='secret';
+
+
+CREATE or replace  API INTEGRATION   GIT_INIT
+  API_PROVIDER = GIT_HTTPS_API
+  API_ALLOWED_PREFIXES = ('https://github.com/hkandpal/snow-git')
+  ENABLED = TRUE
+  ALLOWED_AUTHENTICATION_SECRETS  = (git_secret);
+
+DESC INTEGRATION GIT_INIT;
+
+
+CREATE OR REPLACE GIT REPOSITORY snowflakescripts
+  API_INTEGRATION = GIT_INIT
+  GIT_CREDENTIALS = git_secret
+  ORIGIN = 'https://github.com/hkandpal/snow-git';
+ 
