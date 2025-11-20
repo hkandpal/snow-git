@@ -1,0 +1,385 @@
+create or replace TABLE RAM_governance_db.sch.BATCH_ERROR_LOG (
+	ERROR_DATE TIMESTAMP_NTZ(9) NOT NULL,
+	BATCH_ID NUMBER(38,0) NOT NULL,
+	JOB_NAME VARCHAR(100) NOT NULL,
+	DESCRIPTION VARCHAR(16777216) NOT NULL,
+	ERROR_STMT VARCHAR(16777216) NOT NULL
+);
+
+create or replace TABLE RAM_governance_db.sch.BATCH_DATE_CARD_CLASSIFY (
+	BATCH_ID NUMBER(38,0) NOT NULL autoincrement start 1001 increment 1 order,
+	START_DATE TIMESTAMP_NTZ(9) NOT NULL,
+	END_DATE TIMESTAMP_NTZ(9),
+	STATUS VARCHAR(1) NOT NULL DEFAULT 'R',
+	RERUN_FLAG VARCHAR(1) NOT NULL DEFAULT 'N',
+	SYSADM_CLONE VARCHAR(1) NOT NULL DEFAULT 'N',
+	COMMENTS VARCHAR(500)
+);
+
+create or replace TABLE RAM_governance_db.sch.Classify_RUN_LOGS (
+	BATCH_ID NUMBER(38,0),
+	DB_NAME VARCHAR(100),
+	SCHEMA_NAME VARCHAR(100),
+	TABLE_NAME VARCHAR(100),
+	SQL_STMT VARCHAR(16777216),
+	classif_start_time TIMESTAMP_NTZ(9),
+	classif_end_time TIMESTAMP_NTZ(9)
+);
+
+create or replace TABLE RAM_governance_db.sch.CLASSIFICATION_RESULTS(
+    BATCH_ID NUMBER(38,0),
+    START_DATE TIMESTAMP_NTZ(9),
+	DB_NAME VARCHAR(100),
+	SCHEMA_NAME VARCHAR(100),
+	TABLE_NAME VARCHAR(100),
+	CLASSIFICATION_RESULT VARIANT
+);
+
+
+CREATE OR REPLACE PROCEDURE sch.SNOW_ERROR_CAPTURE(p_batch_id number, p_job_name varchar2,p_error_desc varchar2, p_err_stmt varchar2)
+returns varchar(20000)
+language sql
+as
+$$
+declare
+   v_err_stmt varchar2;
+   v_error_desc varchar2;
+   v_job_name varchar2;
+   v_batch_id number;
+   count number;
+    begin
+
+  if (p_batch_id IS NULL) then
+  v_batch_id :=0;
+  else
+   v_batch_id :=p_batch_id;
+  end if;
+ 
+   if (p_job_name IS NULL) then
+  v_job_name :='UNknown';
+  else
+   v_job_name :=p_job_name;
+  end if;
+ 
+    if (p_error_desc IS NULL) then
+  v_error_desc :='UNknown';
+  else
+   v_error_desc :=p_error_desc;
+  end if;
+  
+    if (p_err_stmt IS NULL) then
+  v_err_stmt :='UNknown';
+  else
+   select replace(replace(:p_err_stmt, '\\', '\\\\'), '\'', '\\\'') into :v_err_stmt;
+   --v_err_stmt := 'test statement';
+  end if;
+  
+     let _sql varchar := 'insert into sch.BATCH_ERROR_LOG
+                (ERROR_DATE , BATCH_ID, JOB_NAME, DESCRIPTION, ERROR_STMT ) 
+                values
+                (current_timestamp ,' || v_batch_id || ',''' || v_job_name || ''',''' || v_error_desc|| ''',''' || v_err_stmt || ''')';
+    execute immediate _sql;
+    --return 'hi returns from here';
+exception
+  when statement_error then
+    return object_construct('Error type', 'STATEMENT_ERROR',
+                            'SQLCODE', sqlcode,
+                            'SQLERRM', sqlerrm,
+                            'SQLSTATE', sqlstate
+                            );
+   when other then
+    return object_construct('Error type', 'Other error',
+                            'SQLCODE', sqlcode,
+                            'SQLERRM', sqlerrm,
+                            'SQLSTATE', sqlstate);
+end;
+
+$$;
+
+
+CREATE OR REPLACE PROCEDURE sch.UDW_DATA_CHECK_BATCH_START_PRC()
+RETURNS VARIANT
+LANGUAGE SQL
+EXECUTE AS OWNER
+AS '
+
+--Declare all variables
+DECLARE
+  v_job_name             VARCHAR;
+    v_current_timestamp VARCHAR;
+    v_batch_running VARCHAR;
+    v_batch_id VARCHAR;
+    v_sis_load_chk INTEGER;
+    v_db_name VARCHAR;
+    v_err_stmt VARCHAR;
+
+BEGIN
+
+v_job_name  := ''UDW_DATA_CHECK_BATCH_START_PRC'';
+
+  select to_char(current_timestamp(),''YYYY-MM-DD HH24:MI:SS'') INTO :v_current_timestamp;
+
+  
+  select sch.UDW_DATA_CHECK_IS_BATCH_RUNNING() INTO :v_batch_running;
+
+	-- Check if Batch is already running
+
+    IF (v_batch_running) THEN
+        INSERT INTO sch.BATCH_ERROR_LOG
+                    (  ERROR_DATE
+                      ,BATCH_ID
+                      ,JOB_NAME
+                      ,DESCRIPTION
+                      ,ERROR_STMT
+                    )
+                  VALUES
+                    (  current_timestamp()
+                      ,-1
+                      ,''UDW_DATA_CHECK_BATCH_START_PRC''
+                      ,''Batch is already Running; Cannot Start Batch''
+                      ,''Start Batch''
+                    );
+        return ''Failed to Start Batch; Batch is already Running'';
+
+    ELSE
+        INSERT INTO sch.BATCH_DATE_CARD_CLASSIFY
+                    (  START_DATE
+                      ,STATUS
+                    )
+                  VALUES
+                    (  current_timestamp()
+                      ,''R''
+                    );
+
+
+        select sch.UDW_DATA_CHECK_GET_CURRENT_RUNNING_BATCH_ID() INTO :v_batch_id;
+
+       return ''Success; Batch Started'';
+    END IF;
+END;   
+';
+
+
+
+
+
+CREATE OR REPLACE FUNCTION sch.UDW_DATA_CHECK_IS_BATCH_RUNNING()
+RETURNS BOOLEAN
+LANGUAGE SQL
+STRICT
+COMMENT='Is Batch Running TRUE Or FALSE'
+AS '
+
+  SELECT CASE WHEN count(*) = 0 THEN FALSE ELSE TRUE END AS IS_RUNNING
+    FROM RAM_governance_db.sch.BATCH_DATE_CARD_CLASSIFY
+   WHERE STATUS = ''R''
+
+';
+
+
+CREATE OR REPLACE FUNCTION sch.UDW_DATA_CHECK_GET_CURRENT_RUNNING_BATCH_ID()
+RETURNS NUMBER(38,0)
+LANGUAGE SQL
+STRICT
+COMMENT='Get Latest Running Batch_id - Status R'
+AS '
+
+  SELECT NVL(MAX(BATCH_ID),0) AS BATCH_ID
+    FROM RAM_governance_db.sch.BATCH_DATE_CARD_CLASSIFY
+   WHERE STATUS = ''R''
+
+';
+
+
+
+UPDATE BATCH_DATE_CARD_BCR set STATUS = 'C' where STATUS= 'R';
+select *  from BATCH_DATE_CARD_BCR order by batch_id desc;
+SELECT* FROM sch.BATCH_JOB_DETAIL_BCR ;
+
+ 
+ 
+select * FROM RAM_governance_db.sch.BATCH_DATE_CARD_BCR ;
+select * FROM RAM_governance_db.sch.BATCH_JOB_DETAIL_BCR;
+-- inside the code
+SELECT BATCH_ID, START_DATE, JOB_NAME  FROM sch.BATCH_JOB_DETAIL_BCR WHERE status = 'I' ;
+
+select database_name , database_owner from information_schema.databases where database_name not in ('SNOWFLAKE_SAMPLE_DATA') order by database_name;
+select catalog_name as database, schema_name from information_schema.schemata where schema_name not in ('INFORMATION_SCHEMA', 'PUBLIC');
+SELECT * FROM information_schema.tables where table_type = 'BASE TABLE';
+
+
+
+ 
+--- THe procedre searches through the Database and all the schema
+
+CREATE OR REPLACE PROCEDURE sch.RUN_CLASSIFIER_FOR_ALL_DB()
+RETURNS VARIANT
+LANGUAGE SQL
+EXECUTE AS OWNER
+AS 
+
+--Declare all variables
+DECLARE
+  v_job_name             VARCHAR;
+    v_current_timestamp VARCHAR;
+    v_batch_running VARCHAR;
+    v_batch_id VARCHAR;
+    sql_stmt VARCHAR;
+    sql_stmt2 VARCHAR;
+    sql_stmt3 VARCHAR;
+    res1 RESULTSET;
+    res2 RESULTSET;
+    res3 RESULTSET;
+    vjob_proc VARCHAR;
+    vCNT INTEGER;
+    vTable_Name VARCHAR;
+     v_err_stmt      varchar;   
+    v_sqlerrm       varchar;
+    vDB_NAME varchar;
+    vSchema_NAME varchar;
+    vTable_name_NAME varchar;
+    vPROC_SQL VARCHAR;
+    vjob_proc2 VARCHAR;
+    v_CLASSIFICATION_RESULT variant;
+
+
+BEGIN
+
+v_job_name  := 'RUN_CLASSIFIER_FOR_ALL_DB';
+
+  select to_char(current_timestamp(),'YYYY-MM-DD HH24:MI:SS') INTO :v_current_timestamp;
+
+  select sch.UDW_DATA_CHECK_IS_BATCH_RUNNING() INTO :v_batch_running;
+
+  
+v_err_stmt := 'START PROC';
+  
+	-- Check if Batch is already running
+
+    IF (v_batch_running) THEN
+        INSERT INTO sch.BATCH_ERROR_LOG
+                    (  ERROR_DATE
+                      ,BATCH_ID
+                      ,JOB_NAME
+                      ,DESCRIPTION
+                      ,ERROR_STMT
+                    )
+                  VALUES
+                    (  current_timestamp()
+                      ,-1
+                      ,'UDW_DATA_CHECK_BATCH_START_PRC'
+                      ,'Batch is already Running; Cannot Start Batch'
+                      ,'Start Batch'
+                    );
+        return 'Failed to Start Batch; Batch is already Running';
+
+    ELSE
+        INSERT INTO sch.BATCH_DATE_CARD_CLASSIFY
+                    (  START_DATE
+                      ,STATUS
+                    )
+                  VALUES
+                    (  current_timestamp()
+                      ,'R'
+                    );
+
+        v_err_stmt := 'Before the UDW_DATA_CHECK_GET_CURRENT_RUNNING_BATCH_ID';
+        select sch.UDW_DATA_CHECK_GET_CURRENT_RUNNING_BATCH_ID() INTO :v_batch_id;
+
+    v_err_stmt := 'Load Batch Detail';
+    
+       
+    END IF;
+
+v_err_stmt := 'Get database name';
+
+--  sql_stmt := 'select database_name from SNOWFLAKE.account_usage.databases where  DELETED is null  and database_name not in (''SNOWFLAKE_SAMPLE_DATA'',''SNOWFLAKE'') order by database_name';
+sql_stmt := 'select database_name from information_schema.databases where database_name not in (''SNOWFLAKE_SAMPLE_DATA'',''SNOWFLAKE'') order by database_name';
+  v_err_stmt := sql_stmt;
+  res1 := (EXECUTE IMMEDIATE :sql_stmt);
+
+    LET cur1 CURSOR FOR res1;
+    v_err_stmt := 'Start Main Loop';
+    FOR row_variable IN cur1 DO
+        vDB_NAME := row_variable.database_name;
+       -- sql_stmt2 := 'select catalog_name as database, schema_name from SNOWFLAKE.account_usage.schemata where  DELETED is null and schema_name 
+       --  not in (''INFORMATION_SCHEMA'', ''PUBLIC'') and catalog_name = ' || '''' || :vDB_NAME ||  '''' ;
+       sql_stmt2 := 'select catalog_name as database, schema_name from ' || :vDB_NAME || '.information_schema.schemata where  schema_name 
+         not in (''INFORMATION_SCHEMA'', ''PUBLIC'') and catalog_name = ' || '''' || :vDB_NAME ||  ''''  ;
+            v_err_stmt := sql_stmt2;
+            res2 := (EXECUTE IMMEDIATE :sql_stmt2);
+            LET cur2 CURSOR FOR res2;
+            v_err_stmt := 'Start Inner Loop';
+            FOR row_variable2 IN cur2 DO
+                v_err_stmt := 'Start 1';
+                vSchema_NAME := row_variable2.schema_name;
+               -- vjob_proc := 'sch.' || row_variable2.JOB_NAME;
+               -- vjob_proc2 := row_variable2.JOB_NAME;
+                v_err_stmt := 'Start 2';
+              --  sql_stmt3 := 'SELECT table_name FROM SNOWFLAKE.account_usage.tables where  DELETED is null and  table_type = ''BASE TABLE''' ||
+             --   ' and table_catalog = ' || '''' || :vDB_NAME ||  ''''   || ' and table_schema = ' || '''' || :vSchema_NAME ||  '''' ;
+                sql_stmt3 := 'SELECT table_name FROM ' ||  :vDB_NAME || '.information_schema.tables where table_type = ''BASE TABLE''' ||
+                ' and table_catalog = ' || '''' || :vDB_NAME ||  ''''   || ' and table_schema = ' || '''' || :vSchema_NAME ||  '''' ;             
+                v_err_stmt := sql_stmt3;
+                res3 := (EXECUTE IMMEDIATE :sql_stmt3); 
+                LET cur3 CURSOR FOR res3;
+                v_err_stmt := 'Inside the table loop';
+                FOR row_variable3 IN cur3 DO
+                    vTable_Name := row_variable3.table_name;
+                    v_err_stmt := 'In Loop for table ' ||  :vTable_Name;
+                    --CALL SYSTEM$CLASSIFY('RAM_data_db.sch.customers', 'SSN_classification_profile');
+                    vPROC_SQL := 'CALL SYSTEM$CLASSIFY(''' || :vDB_NAME || '.' || :vSchema_NAME || '.' || :vTable_Name  || '''' 
+                    || ',' ||  '''' || 'SSN_classification_profile' || ''') ';
+                    v_err_stmt := vPROC_SQL;
+                    select to_char(current_timestamp(),'YYYY-MM-DD HH24:MI:SS') INTO :v_current_timestamp;
+                    BEGIN
+                        EXECUTE IMMEDIATE vPROC_SQL ;
+                        INSERT INTO  RAM_governance_db.sch.Classify_RUN_LOGS (BATCH_ID, DB_NAME ,SCHEMA_NAME ,
+        		                  TABLE_NAME, SQL_STMT , classif_start_time , classif_end_time  )
+                                Values	( :v_batch_id, :vDB_NAME, :vSchema_NAME,
+                                   :vTable_Name,:vPROC_SQL , :v_current_timestamp, current_timestamp);
+                         vPROC_SQL :=' SYSTEM$GET_CLASSIFICATION_RESULT( ''' || :vDB_NAME || '.' || :vSchema_NAME || '.' || :vTable_Name  || ''') ' ;
+                         v_err_stmt := vPROC_SQL;
+                         
+                         vjob_proc2 := ' INSERT INTO RAM_governance_db.sch.CLASSIFICATION_RESULTS(BATCH_ID , START_DATE , DB_NAME,
+                            	SCHEMA_NAME , TABLE_NAME ,CLASSIFICATION_RESULT )
+                                (  select ' || :v_batch_id || ' , '  ||  '''' || current_timestamp() || '''' ||' , ' || '''' ||  :vDB_NAME || ''''
+                                || ' , ' || '''' || :vSchema_NAME || '''' ||  ' , ' || '''' || :vTable_Name || '''' || ' , ' 
+                                || vPROC_SQL || ' ) ';
+    
+                         v_err_stmt := vjob_proc2;
+                     
+                         EXECUTE IMMEDIATE vjob_proc2 ;
+                         exception
+                            when other then
+                            select REPLACE(:sqlerrm, '\\') INTO :v_sqlerrm;
+                            call sch.SNOW_ERROR_CAPTURE(:v_batch_id, :vTable_Name,' SQLCODE  :'|| :sqlcode || ' SQLERRM ' || :v_sqlerrm  ||
+                             ' SQLSTATE ' || :sqlstate, :v_err_stmt);
+          	        END; -- execute block
+                  END FOR; -- Table Loop
+             END FOR; -- Schema Loop     
+    END FOR; --DB Loop
+
+  UPDATE  sch.BATCH_DATE_CARD_CLASSIFY SET END_DATE = CURRENT_TIMESTAMP(), STATUS = 'C' WHERE BATCH_ID = :v_batch_id; 
+
+    
+RETURN 'SUCCESS';
+
+    exception
+        when other then
+            
+            select REPLACE(:sqlerrm, '\\') INTO :v_sqlerrm;
+            call sch.SNOW_ERROR_CAPTURE(:v_batch_id, :vTable_Name,
+                    ' SQLCODE  :'|| :sqlcode || ' SQLERRM ' || :v_sqlerrm  ||
+                         ' SQLSTATE ' || :sqlstate,
+                    :v_err_stmt);
+             
+             UPDATE sch.BATCH_DATE_CARD_CLASSIFY set STATUS = 'E' WHERE batch_id =  :v_batch_id;          
+              return object_construct('Error type', 'STATEMENT_ERROR',
+                                'SQLCODE', sqlcode,
+                                'SQLERRM', sqlerrm,
+                                'SQLSTATE', sqlstate
+                                ); 
+
+END;   
+;
