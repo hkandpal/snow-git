@@ -20,4 +20,6 @@ CREATE OR REPLACE GIT REPOSITORY snowflakescripts
   API_INTEGRATION = GIT_INIT
   GIT_CREDENTIALS = git_secret
   ORIGIN = 'https://github.com/hkandpal/snow-git';
+
+  --testing
  
