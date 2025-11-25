@@ -1,3 +1,4 @@
+--by hk in workspace
 --edited in Git by HK on 11/24
 
 SELECT warehouse_name, SUM(credits_used_compute) as  SUM_credits_used_compute,
