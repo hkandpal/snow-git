@@ -1,3 +1,5 @@
+--edited in Git by HK on 11/24
+
 SELECT warehouse_name, SUM(credits_used_compute) as  SUM_credits_used_compute,
 SUM(credits_attributed_compute_queries) as sum_credits_attributed_compute_queries,
 (SUM(credits_used_compute) - SUM(credits_attributed_compute_queries)) AS idle_cost
