@@ -1,3 +1,5 @@
+select * from SNOWFLAKE.ACCOUNT_USAGE.METERING_DAILY_HISTORY order by usage_date desc;
+
 -- by hk in workspace 2nd time
 --by hk in workspace
 --edited in Git by HK on 11/24
