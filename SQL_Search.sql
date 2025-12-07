@@ -7,14 +7,16 @@ JOIN GOVERNANCE_DB.SCH.SEARCH_DATA_TABLE_COUNT cnt  on cnt.db_name= ic.table_cat
  
 
 select * from data_db.sch.customers;
-  select count(*) from  DATA_DB.SCH.CUSTOMERS WHERE (SEARCH((*), '232-76-1119'));
+  select * from  DATA_DB.SCH.CUSTOMERS WHERE (SEARCH((*), '232-76-1119'));
+    select * from  DATA_DB.SCH.CUSTOMERS WHERE (SEARCH((*), '232-76-1119',SEARCH_MODE => 'AND'));
   select count(*) from  data_db.sch.customers where  (SEARCH((*), '232-76-1119'));
   select * from  ram_data_db.sch.CUSTOMERS_TEST where  (SEARCH((*), '232-76-1119'));
+    select * from  ram_data_db.sch.CUSTOMERS_TEST WHERE (SEARCH((*), '232-76-1119',SEARCH_MODE => 'AND'));
   
 call SEARCH_DATA_IN_ALL_DB ('232-76-1119');
-call GOVERNANCE_DB.SCH.CAPTURE_STR_COUNT(1021);
-select * from GOVERNANCE_DB.SCH.BATCH_SEARCH_DATA;
-select *  from GOVERNANCE_DB.SCH.SEARCH_DATA_TABLE_COUNT;
+call GOVERNANCE_DB.SCH.CAPTURE_STR_COUNT(1027);
+select * from GOVERNANCE_DB.SCH.BATCH_SEARCH_DATA order by batch_id desc;
+select *  from GOVERNANCE_DB.SCH.SEARCH_DATA_TABLE_COUNT order by batch_id desc;
 select *  from  GOVERNANCE_DB.SCH.SEARCH_DATA_COLUMN_COUNT order by batch_id desc , batch_run_id desc;
 
 select *  from  GOVERNANCE_DB.SCH.SEARCH_DATA_ERROR_LOG;
@@ -27,6 +29,11 @@ select count(*)   from RAM_DATA_DB.SCH.CUSTOMERS_NO_SSN WHERE  (SEARCH((*), '232
 --- testing end
 
 CREATE OR REPLACE SEQUENCE GOVERNANCE_DB.SCH.seq_BATCH_RUN_ID START = 1001 INCREMENT = 1 ORDER ;    
+
+create table GOVERNANCE_DB.SCH.DB_CHK (
+DB_NAME VARCHAR(200) ,
+PII_CHECK  varchar(1) );
+
 
 create table GOVERNANCE_DB.SCH.SEARCH_DATA_ERROR_LOG (
 BATCH_ID NUMBER, DB_NAME VARCHAR(200), 
@@ -286,7 +293,9 @@ BEGIN
                 v_err_stmt := 'In Loop for table ' ||  :vTable_Name;
                    --EXECUTE IMMEDIATE vPROC_SQL ;
                     vPROC_SQL := 'select count(*) as cnt from ' || :vDB_NAME || '.' || :vSchema_NAME || '.' || :vTable_Name || 
-                    ' WHERE (SEARCH((*), ' || '''' || strSearch_Value || '''))';
+                    --' WHERE (SEARCH((*), ' || '''' || strSearch_Value || '''))';
+                    --,SEARCH_MODE => 'AND'
+                   ' WHERE (SEARCH((*), '  || '''' || strSearch_Value || '''' || ', SEARCH_MODE => ''AND''))';
                     v_err_stmt := vPROC_SQL;
                     v_row_count := 0; -- Reset count before execution    
                     res_3 := (EXECUTE IMMEDIATE :vPROC_SQL);
@@ -294,9 +303,12 @@ BEGIN
                     FOR temp_row IN temp_cur DO
                         v_row_count := temp_row.cnt; -- Assign the value by the alias 'C'
                     END FOR;
-                                    
+                     -- inserted for debuging 
+                    --  INSERT INTO GOVERNANCE_DB.SCH.SEARCH_DATA_ERROR_LOG (BATCH_ID, DB_NAME, SCHEMA_NAME, TABLE_NAME, ERROR_SQL, ERROR_MSG)
+                    --    VALUES (:v_batch_id, :vDB_NAME, :vSchema_NAME, :vTable_Name, :vPROC_SQL, 'checking in table');
+                        
                     if (v_row_count > 0 ) then
-                     INSERT INTO GOVERNANCE_DB.SCH.SEARCH_DATA_TABLE_COUNT ( BATCH_ID ,DB_NAME , SCHEMA_NAME , TABLE_NAME , ROW_COUNT ,STR_SEARCHED, SQL_USED )
+                     INSERT INTO GOVERNANCE_DB.SCH.SEARCH_DATA_TABLE_COUNT (BATCH_ID,DB_NAME,SCHEMA_NAME,TABLE_NAME,ROW_COUNT,STR_SEARCHED,SQL_USED)
                      values(:v_batch_id, :vDB_NAME, :vSchema_NAME,:vTable_Name,:v_row_count,:strSearch_Value, :vPROC_SQL  );
                    end if;
                   EXCEPTION
@@ -355,4 +367,7 @@ SELECT parse_json(column1) from values
 ('{"id": "819-78-8276","FirstName": "Jerry","LastName": "Pennaang",
         "Address": "234 Village drive , Tampa FL 06677"}');
 
-  select * from  emp WHERE (SEARCH((*), '232-76-1119',));
+  select * from  emp WHERE (SEARCH((*), '232-76-1119'));
+  select * from                 emp WHERE (SEARCH((*), '232-76-1119', SEARCH_MODE => 'AND'));
+select * from GOVERNANCE_DB.SCH.EMP WHERE (SEARCH(*),  '232-76-1119', SEARCH_MODE => 'AND'));
+  
