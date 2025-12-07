@@ -15,9 +15,11 @@ call SEARCH_DATA_IN_ALL_DB ('232-76-1119');
 call GOVERNANCE_DB.SCH.CAPTURE_STR_COUNT(1021);
 select * from GOVERNANCE_DB.SCH.BATCH_SEARCH_DATA;
 select *  from GOVERNANCE_DB.SCH.SEARCH_DATA_TABLE_COUNT;
+select *  from  GOVERNANCE_DB.SCH.SEARCH_DATA_COLUMN_COUNT order by batch_id desc , batch_run_id desc;
+
 select *  from  GOVERNANCE_DB.SCH.SEARCH_DATA_ERROR_LOG;
 delete from  GOVERNANCE_DB.SCH.SEARCH_DATA_ERROR_LOG;
- select *  from  GOVERNANCE_DB.SCH.SEARCH_DATA_COLUMN_COUNT;
+
 
 select *  from CLUSTERING_EXP.TPCDS_CLUSTERING_TEST.CATALOG_SALES WHERE  (SEARCH((CS_PROMO_SK), '232-76-1119')); 
 select count(*)   from RAM_DATA_DB.SCH.CUSTOMERS_NO_SSN WHERE  (SEARCH((*), '232-76-1119'))
@@ -97,7 +99,7 @@ BEGIN
     v_err_stmt := 'START PROC';
     --Join this with the information schema and columns only of    Qualifying columns are those that have TEXT,VARIANT,ARRAY, OBJECT
     sql_stmt := ' SELECT distinct db_name FROM GOVERNANCE_DB.SCH.SEARCH_DATA_TABLE_COUNT
-          WHERE batch_id = ' || :p_batch_id || '  order by db_name  ';
+          WHERE batch_id = ' || :p_batch_id || ' and DB_NAME NOT IN (''GOVERNANCE_DB'') order by db_name  ';
     v_err_stmt := sql_stmt;     
 
      SELECT seq_BATCH_RUN_ID.NEXTVAL into v_seq_BATCH_RUN_ID;
@@ -113,13 +115,15 @@ BEGIN
         not in (''INFORMATION_SCHEMA'', ''PUBLIC'') and catalog_name = ' || '''' || :vDB_NAME ||  '''' --;
         || ' and schema_name not in (''EXCLUDE'') ' ;
         
-    /*select  cnt.db_name,cnt.schema_name,cnt.table_name, ic.column_name ,ic.data_type,cnt.STR_SEARCHED
-    from RAM_DATA_DB.information_schema.columns ic
-    JOIN GOVERNANCE_DB.SCH.SEARCH_DATA_TABLE_COUNT cnt  on cnt.db_name= ic.table_catalog 
-    and cnt.schema_name=ic.table_schema and cnt.table_name=ic.table_name 
-    where batch_id = 1021   and ic.data_type in ('TEXT','VARIANT','ARRAY', 'OBJECT')
-    order by cnt.db_name,cnt.schema_name,cnt.table_name, ic.column_name
-    */
+        /*select  cnt.db_name,cnt.schema_name,cnt.table_name, ic.column_name ,ic.data_type,cnt.STR_SEARCHED
+        from RAM_DATA_DB.information_schema.columns ic
+        JOIN GOVERNANCE_DB.SCH.SEARCH_DATA_TABLE_COUNT cnt  on cnt.db_name= ic.table_catalog 
+        and cnt.schema_name=ic.table_schema and cnt.table_name=ic.table_name 
+        where batch_id = 1021   and ic.data_type in ('TEXT','VARIANT','ARRAY', 'OBJECT')
+        order by cnt.db_name,cnt.schema_name,cnt.table_name, ic.column_name
+        */
+     
+                        
         sql_stmt2 := 'Select  cnt.db_name,cnt.schema_name,cnt.table_name, ic.column_name ,ic.data_type,cnt.STR_SEARCHED
         from '|| :vDB_NAME || '.information_schema.columns ic '
         || 'JOIN GOVERNANCE_DB.SCH.SEARCH_DATA_TABLE_COUNT cnt  on cnt.db_name= ic.table_catalog 
@@ -152,6 +156,8 @@ BEGIN
                  'test_SQL'as SQL_USED,
                 count(*) FROM data_db.sch.customers where  per_num like '%232-76-1119%';
         */
+          
+                        
         vPROC_SQL :='INSERT INTO GOVERNANCE_DB.SCH.SEARCH_DATA_COLUMN_COUNT
         ? AS BATCH_ID,
                  ? as BATCH_RUN_ID,
@@ -162,7 +168,21 @@ BEGIN
                  ? as SQL_USED ,
                  COUNT(*) FROM ' || v_full_table_name 
                  || ' WHERE ' || vColumn_Name || ' LIKE ''' || '%' || vSTR_SEARCHED || '%' || '';
-        
+
+          -- coredte as follows
+          vPROC_SQL := 'INSERT INTO GOVERNANCE_DB.SCH.SEARCH_DATA_COLUMN_COUNT
+ SELECT ' || :v_batch_id || ' AS BATCH_ID,
+        ' || :v_seq_BATCH_RUN_ID || ' AS BATCH_RUN_ID,
+        ''' || vDB_NAME || ''' AS DB_NAME, 
+        ''' || vSchema_NAME || ''' AS SCHEMA_NAME, 
+        ''' || vTable_Name || ''' AS TABLE_NAME, 
+        ''' || vColumn_Name || ''' AS COLUMN_NAME,
+        ''' || REPLACE(:vPROC_SQL, '''', '''''') || ''' AS SQL_USED, -- Escape single quotes in vPROC_SQL itself
+        COUNT(*) 
+ FROM ' || v_full_table_name
+ || ' WHERE ' || vColumn_Name || '::VARCHAR LIKE ''%' || vSTR_SEARCHED || '%''';
+
+        EXECUTE IMMEDIATE :vPROC_SQL; 
         v_err_stmt := 'Start Inner Loop';
         END FOR; -- db loop end
 --db loop end
