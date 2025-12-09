@@ -66,31 +66,32 @@ whse_res  as (
 
 ---final query
 
+-- Final  query this is the join of query , warehouse and seconds table
 with 
 whse_res  as (
     select warehouse_name, nvl(CLUSTER_NUMBER,0) CLUSTER_NBR,timestamp as whse_start  ,event_state,event_name,
      rank() OVER (PARTITION BY warehouse_name,CLUSTER_NBR,event_name ORDER BY timestamp) as series
-    FROM  snowflake.account_usage.warehouse_events_history
+    FROM  sf_account_usage.warehouse_events_history_tbl
      WHERE event_name in ('RESUME_CLUSTER','RESUME_WAREHOUSE-xx','WAREHOUSE_AUTORESUME') AND warehouse_name=$Vwarehouse_name
      )
 ,whse_sus  as (
     select warehouse_name, nvl(CLUSTER_NUMBER,0) CLUSTER_NBR,timestamp as whse_end  ,event_state,event_name,
      rank() OVER (PARTITION BY warehouse_name,CLUSTER_NBR,event_name ORDER BY timestamp) as series
-    FROM  snowflake.account_usage.warehouse_events_history
+    FROM  sf_account_usage.warehouse_events_history_tbl
      WHERE event_name in ('SUSPEND_CLUSTER','SUSPEND_WAREHOUSE-xx','WAREHOUSE_AUTOSUSPEND') AND warehouse_name= $Vwarehouse_name
      )
   , sec as (
     select DATEADD(second,r_num, $interval_start) AS seconds , r_num FROM ( (select current_date()) cd
-    JOIN (select row_number() over(order by null) r_num from table(generator(rowcount => 432000))  ) r
+    JOIN (select row_number() over(order by null) r_num from table(generator(rowcount => 2592000))  ) r
         )  ) 
    , query_sec as (
     select DATEADD(second,r_num, $interval_start) AS seconds , r_num FROM ( (select current_date()) cd
-    JOIN (select row_number() over(order by null) r_num from table(generator(rowcount => 432000))  ) r
+    JOIN (select row_number() over(order by null) r_num from table(generator(rowcount => 2592000))  ) r
         )  ) 
  , query_exec_time as (
     select distinct query_sec.seconds, warehouse_name,nvl(cluster_number,0)cluster_number,
     DATE_TRUNC('second', start_time) start_time,DATE_TRUNC('second', end_time) end_time
-    FROM snowflake.account_usage.query_history qh
+    FROM NYU_REF_DATA_PROD.sf_account_usage.query_history qh
      --   join sec on sec.seconds between qh.start_time and qh.end_time 
     join query_sec on query_sec.seconds between DATEADD(second, -1, qh.start_time) and qh.end_time   
     where warehouse_name= $Vwarehouse_name 
@@ -101,6 +102,7 @@ whse_res  as (
   select  sec.seconds as whse_up_seconds, qs.seconds as sec_no_qry_running, decode(sec_no_qry_running,null,1,0) qry_running, 
     sum(qry_running) over (partition by DATE_TRUNC('HOUR', sec.seconds)) total_sec_no_qry_running_in_an_hour,
     sum(qry_running) over (partition by DATE_TRUNC('DAY', sec.seconds)) total_sec_no_qry_running_in_an_day,
+     sum(decode(sec_no_qry_running,null,1,1)) over (partition by DATE_TRUNC('HOUR', sec.seconds)) total_sec_whse_running_in_an_hour,
     sum(decode(sec_no_qry_running,null,1,1)) over (partition by DATE_TRUNC('DAY', sec.seconds)) total_sec_whse_running_in_an_day,
     res.warehouse_name,  res.CLUSTER_NBR, --res.series,
     res.event_name,  datediff('seconds', whse_start, sec.seconds) as running_sec,
@@ -113,5 +115,5 @@ whse_res  as (
                 and qs.seconds = sec.seconds
     --where whse_start > current_date() -2
    qualify ROW_NUMBER()    OVER  (partition by DATE_TRUNC('HOUR', sec.seconds) order by sec.seconds) = 1
-   --qualify ROW_NUMBER()    OVER  (partition by DATE_TRUNC('DAY', sec.seconds) order by sec.seconds) = 1
+  -- qualify ROW_NUMBER()    OVER  (partition by DATE_TRUNC('DAY', sec.seconds) order by sec.seconds) = 1
     order by res.whse_start ,running_sec ;
