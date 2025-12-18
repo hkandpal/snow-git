@@ -7,6 +7,7 @@ JOIN GOVERNANCE_DB.SCH.SEARCH_DATA_TABLE_COUNT cnt  on cnt.db_name= ic.table_cat
  
 
 select * from data_db.sch.customers;
+  select (SEARCH((CUSTOMERS.*), '232-76-1119')), account_number from  DATA_DB.SCH.CUSTOMERS WHERE (SEARCH((*), '232-76-1119'));
   select * from  DATA_DB.SCH.CUSTOMERS WHERE (SEARCH((*), '232-76-1119'));
     select * from  DATA_DB.SCH.CUSTOMERS WHERE (SEARCH((*), '232-76-1119',SEARCH_MODE => 'AND'));
   select count(*) from  data_db.sch.customers where  (SEARCH((*), '232-76-1119'));
