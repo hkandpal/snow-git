@@ -10,4 +10,4 @@ CREATE SCHEMA CSV_FILES;
 CREATE STAGE PUBLIC_FILES ENCRYPTION = (TYPE = 'SNOWFLAKE_SSE');
 
 
-select * from data_db.sch.customers;
+select * from data_db.sch.customers; 

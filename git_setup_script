@@ -21,5 +21,5 @@ CREATE OR REPLACE GIT REPOSITORY snowflakescripts
   GIT_CREDENTIALS = git_secret
   ORIGIN = 'https://github.com/hkandpal/snow-git';
 
-  --testing
+  --
  
