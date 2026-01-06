@@ -4,10 +4,15 @@ CREATE NOTIFICATION INTEGRATION EMAIL_INT
   ALLOWED_RECIPIENTS = ( 'hk69@nyu.edu' )
   DEFAULT_SUBJECT = 'Email Notification';
 
-  CREATE DATABASE FILES_DB;
+CREATE DATABASE FILES_DB;
 USE DATABASE FILES_DB;
 CREATE SCHEMA CSV_FILES;
 CREATE STAGE PUBLIC_FILES ENCRYPTION = (TYPE = 'SNOWFLAKE_SSE');
 
 
-select * from data_db.sch.customers; 
+
+CREATE DATABASE TEST;
+create schema TEST_SCHEMA;
+
+create or replace view TEST.TEST_SCHEMA.EMP as select * from data_db.sch.customers; 
+
