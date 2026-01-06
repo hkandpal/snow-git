@@ -274,7 +274,3 @@ select SYSTEM$GET_CLASSIFICATION_RESULT('data_db.sch.customers_new');
 -- ran the on friday and  the value was hidden for role analyst
 select * from data_db.sch.customers_new;
 -- end Monday test
-
-
-
-
