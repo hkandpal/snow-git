@@ -167,9 +167,7 @@ CREATE OR REPLACE SNOWFLAKE.DATA_PRIVACY.CLASSIFICATION_PROFILE SSN_classificati
 );
 
 
---describe the SSN Classification Profile
-
-SELECT SSN_classification_profile!DESCRIBE();
+ 
 
 
 -- 7 Run with a custom classifier
