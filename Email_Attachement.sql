@@ -15,7 +15,7 @@ CREATE DATABASE TEST;
 create schema TEST_SCHEMA;
 
 create or replace view TEST.TEST_SCHEMA.EMP as select * from data_db.sch.customers; 
-
+select * from TEST.TEST_SCHEMA.emp;
 
 select $1 , $2 from @FILES_DB.CSV_FILES.PUBLIC_FILES;
 select GET_PRESIGNED_URL(@FILES_DB.CSV_FILES.PUBLIC_FILES,'employee_details_geit0k_f.csv');
