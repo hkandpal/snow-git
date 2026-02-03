@@ -50,13 +50,14 @@ insert into Life_cycle_DB.LC_SCHEMA.account_delete (account_number) values (1589
 -- Expiration
 --ARCHIVE_TIER = { COOL | COLD }
 --If you don’t specify this parameter, the policy is an expiration policy that deletes rows without archiving them.
+
 Create or replace storage lifecycle policy expire_account
 AS (i_account_number NUMBER) returns BOOLEAN ->
 EXISTS (SELECT 1 from account_delete where account_number = i_account_number );
 
 ALTER table   Life_cycle_DB.LC_SCHEMA.customers add storage lifecycle policy  expire_account on (account_number);
 
-SELECT * FROM TABLE(information_schema.policy_references( policy_name => 'Life_cycle_DB.LC_SCHEMA.expire_account'));
+
 select * FROM  Life_cycle_DB.LC_SCHEMA.customers where account_number = 1589420;
 
 
@@ -75,8 +76,14 @@ CREATE OR REPLACE STORAGE LIFECYCLE POLICY Life_cycle_DB.LC_SCHEMA.archive_after
     ARCHIVE_FOR_DAYS = 180; 
 
  -- Assign the 60-day organizer to the customers table
-ALTER TABLE Life_cycle_DB.LC_SCHEMA.customers 
+ALTER TABLE Life_cycle_DB.LC_SCHEMA.customer_detail 
   add STORAGE LIFECYCLE POLICY Life_cycle_DB.LC_SCHEMA.archive_after_60_days 
   ON (entered_date);
 
-ALTER table   Life_cycle_DB.LC_SCHEMA.customer_detail add storage lifecycle policy  expire_account on (account_number);
+ 
+SELECT p.policy_name, p.* FROM TABLE(information_schema.policy_references( policy_name => 'Life_cycle_DB.LC_SCHEMA.expire_account'))p  UNION
+SELECT p.policy_name, p.* FROM TABLE(information_schema.policy_references( policy_name => 'Life_cycle_DB.LC_SCHEMA.archive_after_60_days')) p;
+
+SELECT * FROM   TABLE (INFORMATION_SCHEMA.STORAGE_LIFECYCLE_POLICY_HISTORY(REF_ENTITY_NAME => 'Life_cycle_DB.LC_SCHEMA.customers', REF_ENTITY_DOMAIN => 'Table'));
+SELECT * FROM   TABLE (INFORMATION_SCHEMA.STORAGE_LIFECYCLE_POLICY_HISTORY(REF_ENTITY_NAME => 'Life_cycle_DB.LC_SCHEMA.customer_detail', REF_ENTITY_DOMAIN => 'Table'));
+SELECT * FROM SNOWFLAKE.ACCOUNT_USAGE.REPLICATION_USAGE_HISTORY;
