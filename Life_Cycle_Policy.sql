@@ -33,6 +33,15 @@ INSERT INTO Life_cycle_DB.LC_SCHEMA.customers (account_number, first_name, last_
      (8045387, 'Jason', 'Jane', 'Jason.barber@example.com','459 78 3439', NULL,'456788235', to_date('1988-07-31','YYYY-MM-DD'), '1988-07-31',TO_TIMESTAMP('1988-07-31 00:00:00.000', 'YYYY-MM-DD HH24:MI:SS.FF3'),TO_TIMESTAMP('1988-07-31 00:00:00.000', 'YYYY-MM-DD HH24:MI:SS.FF3'), current_date(), '2003-05-29 00:00:00.000'),
      (8689067, 'James', 'simpson', 'James@example.com','456788235', NULL,'345788255', to_date('1999-05-31','YYYY-MM-DD'), '1999-05-31',TO_TIMESTAMP('1999-05-31 00:00:00.000', 'YYYY-MM-DD HH24:MI:SS.FF3'),TO_TIMESTAMP('1999-05-31 00:00:00.000', 'YYYY-MM-DD HH24:MI:SS.FF3'), current_date() , '2001-09-30 00:00:00.000');
 
+
+-- old rows to be entered to archive the data 60 days old
+INSERT INTO Life_cycle_DB.LC_SCHEMA.customers (account_number, first_name, last_name, email, per_num,Social_Security_Num, nine_char,
+ BIRTHDATE_date , BIRTHDATE_varchar,  BIRTHDATE_time_stamp, BIRTHDATE, entered_date ,date_of_birth   )
+ VALUES
+ (2345679, 'Nick', 'doe', 'john.doe@example.com', '232-76-1119', '232-76-1119','434689191', to_date('1988-02-23','YYYY-MM-DD'), '1988-02-23',TO_TIMESTAMP('1988-02-23 00:00:00.000', 'YYYY-MM-DD HH24:MI:SS.FF3'),TO_TIMESTAMP('1988-02-23 00:00:00.000', 'YYYY-MM-DD HH24:MI:SS.FF3'), current_date() - 90, '1988-07-25 00:00:00.000') ,
+ (4445458, 'Nickeloden', 'Roth', 'john.doe@example.com', '232-76-1119', '232-76-1119','434689191', to_date('1988-02-23','YYYY-MM-DD'), '1988-02-23',TO_TIMESTAMP('1988-02-23 00:00:00.000', 'YYYY-MM-DD HH24:MI:SS.FF3'),TO_TIMESTAMP('1988-02-23 00:00:00.000', 'YYYY-MM-DD HH24:MI:SS.FF3'), current_date() - 85, '1988-07-25 00:00:00.000') ;
+ 
+
 select * FROM  Life_cycle_DB.LC_SCHEMA.customers;
 
 Create or replace table Life_cycle_DB.LC_SCHEMA.account_delete (account_number NUMBER(38,0));
@@ -49,3 +58,25 @@ ALTER table   Life_cycle_DB.LC_SCHEMA.customers add storage lifecycle policy  ex
 
 SELECT * FROM TABLE(information_schema.policy_references( policy_name => 'Life_cycle_DB.LC_SCHEMA.expire_account'));
 select * FROM  Life_cycle_DB.LC_SCHEMA.customers where account_number = 1589420;
+
+
+
+--- Create a new table to test COOL tier
+create or replace table Life_cycle_DB.LC_SCHEMA.customer_detail as select * from Life_cycle_DB.LC_SCHEMA.customers;
+
+ select * from Life_cycle_DB.LC_SCHEMA.customer_detail where entered_date < current_date - 60;
+
+ -- Create the policy (The "Quick-Tidying Helper")
+CREATE OR REPLACE STORAGE LIFECYCLE POLICY Life_cycle_DB.LC_SCHEMA.archive_after_60_days
+  AS (entered_date DATE)
+  RETURNS BOOLEAN  ->
+    entered_date < DATEADD('day', -60, CURRENT_DATE())  
+    ARCHIVE_TIER = COOL
+    ARCHIVE_FOR_DAYS = 180; 
+
+ -- Assign the 60-day organizer to the customers table
+ALTER TABLE Life_cycle_DB.LC_SCHEMA.customers 
+  add STORAGE LIFECYCLE POLICY Life_cycle_DB.LC_SCHEMA.archive_after_60_days 
+  ON (entered_date);
+
+ALTER table   Life_cycle_DB.LC_SCHEMA.customer_detail add storage lifecycle policy  expire_account on (account_number);
