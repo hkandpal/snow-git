@@ -57,7 +57,6 @@ EXISTS (SELECT 1 from account_delete where account_number = i_account_number );
 
 ALTER table   Life_cycle_DB.LC_SCHEMA.customers add storage lifecycle policy  expire_account on (account_number);
 
-
 select * FROM  Life_cycle_DB.LC_SCHEMA.customers where account_number = 1589420;
 
 
@@ -66,6 +65,9 @@ select * FROM  Life_cycle_DB.LC_SCHEMA.customers where account_number = 1589420;
 create or replace table Life_cycle_DB.LC_SCHEMA.customer_detail as select * from Life_cycle_DB.LC_SCHEMA.customers;
 
  select * from Life_cycle_DB.LC_SCHEMA.customer_detail where entered_date < current_date - 60;
+ CREATE TABLE Life_cycle_DB.LC_SCHEMA.customer_detail_archive FROM ARCHIVE OF Life_cycle_DB.LC_SCHEMA.customer_detail
+ WHERE   entered_date < current_date - 60;
+ select * from Life_cycle_DB.LC_SCHEMA.customer_detail_archive;
 
  -- Create the policy (The "Quick-Tidying Helper")
 CREATE OR REPLACE STORAGE LIFECYCLE POLICY Life_cycle_DB.LC_SCHEMA.archive_after_60_days
@@ -86,4 +88,13 @@ SELECT p.policy_name, p.* FROM TABLE(information_schema.policy_references( polic
 
 SELECT * FROM   TABLE (INFORMATION_SCHEMA.STORAGE_LIFECYCLE_POLICY_HISTORY(REF_ENTITY_NAME => 'Life_cycle_DB.LC_SCHEMA.customers', REF_ENTITY_DOMAIN => 'Table'));
 SELECT * FROM   TABLE (INFORMATION_SCHEMA.STORAGE_LIFECYCLE_POLICY_HISTORY(REF_ENTITY_NAME => 'Life_cycle_DB.LC_SCHEMA.customer_detail', REF_ENTITY_DOMAIN => 'Table'));
+
 SELECT * FROM SNOWFLAKE.ACCOUNT_USAGE.REPLICATION_USAGE_HISTORY;
+
+SHOW STORAGE LIFECYCLE POLICIES  ;
+SELECT * FROM TABLE(Life_cycle_DB.INFORMATION_SCHEMA.POLICY_REFERENCES(
+    REF_ENTITY_NAME => 'Life_cycle_DB.LC_SCHEMA.customer_detail', 
+    REF_ENTITY_DOMAIN => 'TABLE'
+));
+
+
