@@ -59,12 +59,14 @@ ALTER table   Life_cycle_DB.LC_SCHEMA.customers add storage lifecycle policy  ex
 
 select * FROM  Life_cycle_DB.LC_SCHEMA.customers where account_number = 1589420;
 
-
+CREATE TABLE Life_cycle_DB.LC_SCHEMA.customers_archive FROM ARCHIVE OF Life_cycle_DB.LC_SCHEMA.customers
+where account_number in (SELECT account_number from account_delete);
 
 --- Create a new table to test COOL tier
 create or replace table Life_cycle_DB.LC_SCHEMA.customer_detail as select * from Life_cycle_DB.LC_SCHEMA.customers;
 
  select * from Life_cycle_DB.LC_SCHEMA.customer_detail where entered_date < current_date - 60;
+ 
  CREATE TABLE Life_cycle_DB.LC_SCHEMA.customer_detail_archive FROM ARCHIVE OF Life_cycle_DB.LC_SCHEMA.customer_detail
  WHERE   entered_date < current_date - 60;
  select * from Life_cycle_DB.LC_SCHEMA.customer_detail_archive;

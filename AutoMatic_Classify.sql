@@ -106,8 +106,8 @@ CALL SYSTEM$CLASSIFY('RAM_data_db.sch.customers', 'SSN_classification_profile');
 --CALL SYSTEM$CLASSIFY('RAM_GOVERNANCE_DB.SCH.BATCH_DATE_CARD_BCR','SSN_classification_profile') 
 select current_role();
 -- if you want at Schema level then use the following
---ALTER schema RAM_data_db.sch set CLASSIFICATION_PROFILE = 'RAM_data_db.sch.SSN_classification_profile';
-
+--ALTER schema RAM_data_db.sch set CLASSIFICATION_PROFILE = 'RAM_data_db.sch.SSN_classification_profile';;
+ALTER schema RAM_data_db.sch unset CLASSIFICATION_PROFILE 
 --SELECT SYSTEM$GET_CLASSIFICATION_RESULT('RAM_data_db.sch.customers');
 
 -- 1)  Procedure to   run CLASSIFICATION_PROFILE at a account level, this will scan all the DB's and the Schemas.
