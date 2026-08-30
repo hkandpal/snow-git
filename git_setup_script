@@ -25,3 +25,15 @@ CREATE OR REPLACE GIT REPOSITORY snowflakescripts
 
   --testing
  
+-- ** TO see the Git repo and if the following 
+-- 1) ONce you see all the repos by using the command LIST @git.git_schema.my_local_stage;
+-- 2) Then select the + sign and Select Create new Git repo
+
+
+CREATE STAGE IF NOT EXISTS git.git_schema.my_local_stage;
+SHOW STAGES IN SCHEMA git.git_schema;
+ALTER GIT REPOSITORY git.git_schema.snowflakescripts FETCH;
+LIST @git.git_schema.snowflakescripts/branches/main;
+COPY FILES   INTO @git.git_schema.my_local_stage/   FROM @git.git_schema.snowflakescripts/branches/main/;
+LIST @git.git_schema.my_local_stage;
+
